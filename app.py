@@ -112,47 +112,57 @@ if menu == "Cek Prediksi":
                 
                 # --- PRE-PROCESSING: BEBERSIH DATA FORMAT IPS TIPE STRING ---
                 def fix_ips_format(val):
-                    clean_val = str(val).replace('.', '')
-                    if not clean_val or clean_val.lower() == 'nan':
+                    if pd.isna(val) or val == '':
                         return 0.0
-                    if len(clean_val) > 1:
-                        return float(clean_val[0] + '.' + clean_val[1:])
-                    return float(clean_val)
+                    clean_val = str(val).replace('.', '').replace(',', '.')
+                    if clean_val.lower() == 'nan' or not clean_val:
+                        return 0.0
+                    
+                    try:
+                        # Coba parse float langsung (jika input sudah bersih seperti '3.5')
+                        return float(clean_val)
+                    except ValueError:
+                        # Jika angka ribuan karena kesalahan koma, paksa digit pertama jadi satuan
+                        if len(clean_val) > 1 and clean_val.replace('.', '').isdigit():
+                            clean_val_nodot = clean_val.replace('.', '')
+                            return float(clean_val_nodot[0] + '.' + clean_val_nodot[1:])
+                        return 0.0
 
                 kolom_ips = ['IPS_Sem1', 'IPS_Sem2', 'IPS_Sem3', 'IPS_Sem4']
                 for col_ips in kolom_ips:
                     X_massal_raw[col_ips] = X_massal_raw[col_ips].apply(fix_ips_format)
 
                 # --- PRE-PROCESSING: MAPPING KATEGORI STRING KE NUMERIK ---
-                mapping_gender = {'Laki-laki': 1, 'Perempuan': 0, 'Laki-Laki': 1}
-                mapping_umum = {'Ada': 1, 'Tidak Ada': 0, 'Ya': 1, 'Tidak': 0}
-                
-                # Mapping nilai abjad menjadi angka (skala 0-100)
-                mapping_nilai_huruf = {
-                    'A': 85, 'A-': 80, 
-                    'B+': 75, 'B': 70, 'B-': 65, 
-                    'C+': 60, 'C': 55, 'C-': 50, 
-                    'D': 40, 'E': 0
-                }
-                
+                # Mengubah teks "Laki-laki" / "Perempuan", "Ada" / "Tidak", huruf "A/B/C" ke angka numerik
                 if X_massal_raw['Gender'].dtype == object:
-                    X_massal_raw['Gender'] = X_massal_raw['Gender'].replace(mapping_gender)
+                    X_massal_raw['Gender'] = X_massal_raw['Gender'].str.strip().str.title().replace({
+                        'Laki-Laki': 1, 'Laki-Laki ': 1, 'Laki': 1, 'Pria': 1, 
+                        'Perempuan': 0, 'Wanita': 0
+                    })
                     
                 if X_massal_raw['Status_Beasiswa'].dtype == object:
-                    X_massal_raw['Status_Beasiswa'] = X_massal_raw['Status_Beasiswa'].replace(mapping_umum)
+                    X_massal_raw['Status_Beasiswa'] = X_massal_raw['Status_Beasiswa'].str.strip().str.title().replace({
+                        'Ada': 1, 'Ya': 1, 'Y': 1, 
+                        'Tidak Ada': 0, 'Tidak': 0, 'T': 0
+                    })
                     
                 if X_massal_raw['Bekerja'].dtype == object:
-                    X_massal_raw['Bekerja'] = X_massal_raw['Bekerja'].replace(mapping_umum)
+                    X_massal_raw['Bekerja'] = X_massal_raw['Bekerja'].str.strip().str.title().replace({
+                        'Ada': 1, 'Ya': 1, 'Y': 1, 
+                        'Tidak Ada': 0, 'Tidak': 0, 'T': 0
+                    })
                     
                 if X_massal_raw['Nilai_Matkul_Killer'].dtype == object:
-                    X_massal_raw['Nilai_Matkul_Killer'] = X_massal_raw['Nilai_Matkul_Killer'].str.strip()
-                    X_massal_raw['Nilai_Matkul_Killer'] = X_massal_raw['Nilai_Matkul_Killer'].replace(mapping_nilai_huruf)
+                    X_massal_raw['Nilai_Matkul_Killer'] = X_massal_raw['Nilai_Matkul_Killer'].str.strip().str.upper().replace({
+                        'A': 85, 'A-': 80, 'B+': 75, 'B': 70, 'B-': 65, 
+                        'C+': 60, 'C': 55, 'C-': 50, 'D': 40, 'E': 0
+                    })
                     
-                # Pastikan di-cast ke bentuk numerik setelah direplace
-                X_massal_raw['Gender'] = pd.to_numeric(X_massal_raw['Gender'], errors='coerce')
-                X_massal_raw['Status_Beasiswa'] = pd.to_numeric(X_massal_raw['Status_Beasiswa'], errors='coerce')
-                X_massal_raw['Bekerja'] = pd.to_numeric(X_massal_raw['Bekerja'], errors='coerce')
-                X_massal_raw['Nilai_Matkul_Killer'] = pd.to_numeric(X_massal_raw['Nilai_Matkul_Killer'], errors='coerce')
+                # Pastikan di-cast ke bentuk numerik untuk menghindari error ML
+                kolom_numerik = ['Gender', 'Status_Beasiswa', 'Bekerja', 'Nilai_Matkul_Killer', 
+                                 'Total_SKS_Ambil', 'Total_SKS_Lulus', 'Jml_Mengulang']
+                for col in kolom_numerik:
+                    X_massal_raw[col] = pd.to_numeric(X_massal_raw[col], errors='coerce').fillna(0)
 
                 # Menghitung Fitur Turunan (sesuai data training)
                 X_massal_raw['SKS_Efficiency'] = X_massal_raw.apply(
