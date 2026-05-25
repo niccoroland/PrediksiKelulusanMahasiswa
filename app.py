@@ -245,4 +245,51 @@ if menu == "Cek Prediksi":
                     st.error(f"⚠️ Model AI mengalami error saat prediksi. Pastikan tipe data pada CSV sesuai. Error code: {e}")
 
 elif menu == "Statistik Data":
-    st.write("Silakan masukkan kode visualisasi data kamu di sini.")
+    st.subheader("📊 Eksplorasi Data Training Mahasiswa")
+    st.write("Visualisasi *insight* dari dataset asli (`prediksi kelulusan mhs.csv`) yang digunakan untuk melatih model AI.")
+    
+    import plotly.express as px
+
+    # Parsing data untuk visualisasi yang aman
+    df_viz = df.copy()
+    
+    # Mapping label biar bisa terbaca di grafik
+    df_viz['Status Kelulusan'] = df_viz['Label_Lulus'].map({0: 'Tepat Waktu', 1: 'Terlambat'})
+    
+    # Cleansing & konversi ke numerik khusus untuk kolom analisis
+    df_viz['Total_SKS_Ambil'] = pd.to_numeric(df_viz['Total_SKS_Ambil'], errors='coerce')
+    df_viz['Total_SKS_Lulus'] = pd.to_numeric(df_viz['Total_SKS_Lulus'], errors='coerce')
+    df_viz['Nilai_Matkul_Killer'] = pd.to_numeric(df_viz['Nilai_Matkul_Killer'], errors='coerce')
+    df_viz['Jml_Mengulang'] = pd.to_numeric(df_viz['Jml_Mengulang'], errors='coerce')
+
+    tab_viz1, tab_viz2, tab_viz3 = st.tabs(["🎯 Distribusi Kelulusan", "📚 Analisis SKS", "☠️ Sebaran Matkul Killer"])
+    
+    with tab_viz1:
+        st.markdown("#### Perbandingan Jumlah Mahasiswa Tepat Waktu vs Terlambat")
+        st.write("Melihat proporsi kelulusan mahasiswa pada data asli.")
+        
+        rekap_lulus = df_viz['Status Kelulusan'].value_counts().reset_index()
+        rekap_lulus.columns = ['Status Kelulusan', 'Jumlah']
+        
+        fig1 = px.pie(rekap_lulus, names='Status Kelulusan', values='Jumlah', 
+                      color='Status Kelulusan', 
+                      color_discrete_map={'Tepat Waktu':'#2ecc71', 'Terlambat':'#e74c3c'},
+                      hole=0.4)
+        st.plotly_chart(fig1, use_container_width=True)
+        
+    with tab_viz2:
+        st.markdown("#### Hubungan SKS yang Diambil dengan SKS yang Lulus")
+        st.write("Semakin jauh jarak titik merah dari titik hijau, semakin besar potensi keterlambatan kelulusan.")
+        
+        fig2 = px.scatter(df_viz, x='Total_SKS_Ambil', y='Total_SKS_Lulus', color='Status Kelulusan',
+                          color_discrete_map={'Tepat Waktu':'#2ecc71', 'Terlambat':'#e74c3c'},
+                          hover_data=['Total_SKS_Ambil', 'Total_SKS_Lulus'])
+        st.plotly_chart(fig2, use_container_width=True)
+        
+    with tab_viz3:
+        st.markdown("#### Sebaran Nilai Pada Mata Kuliah Tersulit")
+        st.write("Boxplot menunjukkan rata-rata (garis tengah) nilai pada mata kuliah *killer* yang didapatkan mahasiswa.")
+        
+        fig3 = px.box(df_viz, x='Status Kelulusan', y='Nilai_Matkul_Killer', color='Status Kelulusan',
+                      color_discrete_map={'Tepat Waktu':'#2ecc71', 'Terlambat':'#e74c3c'})
+        st.plotly_chart(fig3, use_container_width=True)
